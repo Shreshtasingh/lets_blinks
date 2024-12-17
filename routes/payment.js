@@ -6,9 +6,9 @@ const express = require('express');
 const router = express.Router();
 
 const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
+    key_id: "rzp_test_wH6z5OiN0u1yCi", // Replace with your actual key ID
+    key_secret: "FGJo1JytwsUuEBkAkZEeB3OB", // Replace with your actual key secret
+  });
 
 // Endpoint to create a Razorpay order
 router.post('/create/orderId', async (req, res) => {
