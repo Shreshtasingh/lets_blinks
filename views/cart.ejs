@@ -1,0 +1,128 @@
+<%- include('./partials/header'); %>
+
+<body class="bg-gray-100 font-sans">
+  <div class="max-w-screen-md mx-auto p-4">
+    <!-- Header -->
+    <div class="flex justify-between items-center py-4">
+      <button class="text-lg"><i class="ri-arrow-left-s-line"></i></button>
+      <h1 class="text-xl font-semibold">Checkout</h1>
+      <button class="text-lg">Share</button>
+    </div>
+
+    <!-- Cart Details -->
+    <% if (cart && cart.length > 0) { %>
+      <div class="bg-white p-4 rounded-lg shadow mb-4">
+        <h2 class="text-lg font-semibold">Your Cart</h2>
+        <% cart.forEach((item) => { %>
+          <div class="flex items-center mt-4">
+            <img src="data:image/jpg;base64,<%= item.image.toString('base64') %>" alt="<%= item.name %>" class="w-16 h-16 rounded">
+            <div class="ml-4">
+              <p><%= item.name %></p>
+              <p class="text-xs text-gray-500">170 g</p>
+            </div>
+            <div class="ml-auto">
+              <div class="flex items-center bg-green-700 text-white rounded-md">
+                <a href="/cart/remove/<%= item._id %>" class="px-2 py-1 rounded"><i class="ri-subtract-line"></i></a>
+                <p class="mx-2"><%= item.quantity %></p>
+                <button class="px-2 py-1 rounded"><i class="ri-add-line"></i></button>
+              </div>
+              <p>₹<%= item.price * item.quantity %></p>
+            </div>
+          </div>
+        <% }); %>
+      </div>
+    <% } else { %>
+      <p class="text-center text-gray-500">Your cart is empty.</p>
+    <% } %>
+
+    <!-- Bill Details -->
+    <div class="bg-white p-4 rounded-lg shadow mb-4">
+      <h2 class="text-lg font-semibold">Bill details</h2>
+      <div class="flex justify-between">
+        <p class="text-sm">Total</p>
+        <p class="text-sm">₹<%= finalprice %></p>
+      </div>
+    </div>
+
+    <!-- Payment -->
+    <div class="bg-white p-4 rounded-lg shadow">
+      <button class="paybtn bg-green-700 text-white px-4 py-2 rounded">Place Order</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  
+  <script>
+    document.querySelector('.paybtn').onclick = function (e) {
+      e.preventDefault(); // Prevent default button behavior
+
+      const amount = parseFloat("<%= finalprice %>");
+      console.log('Final Price:', amount);  // Debugging: Log the final price
+
+      // Check if the amount is valid and within the Razorpay limit
+      if (amount <= 0 || amount > 100000) {
+        alert('Invalid amount or exceeds limit of ₹100,000');
+        return;
+      }
+
+      // Step 1: Create order by calling backend with the amount
+      axios.post('/payment/create/orderId', { amount })
+        .then((response) => {
+          const order = response.data;
+
+          // Step 2: Define Razorpay payment options
+          const options = {
+            key: "<%= process.env.RAZORPAY_KEY_ID %>", // Razorpay Key ID
+            amount: order.amount, // Amount in the smallest currency unit (paise)
+            currency: order.currency, // Currency type
+            name: "BlinkIt", // Merchant name
+            description: "Order Payment",
+            order_id: order.id, // Razorpay Order ID from the backend
+            handler: function(response) {
+              // Step 3: Verify payment
+              axios.post('/payment/api/payment/verify', {
+                razorpayOrderId: response.razorpay_order_id,
+                razorpayPaymentId: response.razorpay_payment_id,
+                signature: response.razorpay_signature,
+              })
+              .then(() => {
+                alert('Payment Successful!');
+                window.location.href = `/order/success`; // Redirect to success page
+              })
+              .catch(() => {
+                alert('Payment verification failed!');
+              });
+            },
+            prefill: {
+              name: "Customer Name", // Prefill customer name
+              email: "customer@example.com", // Prefill email
+              contact: "9876543210", // Prefill contact number
+            },
+            theme: {
+              color: "#3399cc", // Theme color for Razorpay
+            },
+          };
+
+          // Step 4: Initialize Razorpay
+          const rzp = new Razorpay(options);
+
+          // Step 5: Handle payment failure
+          rzp.on('payment.failed', function(response) {
+            console.error('Payment Failed:', response.error);
+            alert('Payment Failed: ' + response.error.description);
+          });
+
+          // Step 6: Open Razorpay payment dialog
+          rzp.open();
+        })
+        .catch((err) => {
+          console.error('Error creating Razorpay order:', err);
+          alert('Failed to initialize payment. Please try again.');
+        });
+    };
+  </script>
+  
+</body>
+
+<%- include('./partials/footer'); %>
